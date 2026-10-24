@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>物料儲位看板</title>
+<style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    @font-face { font-family: 'Biome'; src: url('../BiomeW04-Wide.woff2') format('woff2'); font-weight: normal; font-style: normal; }
+    body { font-family: 'Biome', 'Segoe UI', sans-serif; background-color: #082334; width: 100%; height: 100vh; padding: 56px 20px 20px 20px; box-sizing: border-box; position: relative; overflow: hidden; }
+
+    .header { position: absolute; left: 0; top: 0; width: 100%; height: 56px; display: flex; align-items: center; padding-left: 20px; }
+    .header-title { font-size: 24px; color: #fff; letter-spacing: 2px; }
+    .header-datetime { margin-left: auto; margin-right: 20px; color: rgb(96,175,234); font-size: 14px; opacity: 0.8; }
+
+    .main-layout { width: 100%; height: 100%; display: flex; gap: 6px; }
+
+    /* Left: Summary cards */
+    .summary-col { width: 200px; display: flex; flex-direction: column; gap: 3px; flex-shrink: 0; }
+    .summary-card { background: #243E4B; border-radius: 8px; padding: 4px 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; }
+    .summary-label { color: #8BA5B5; font-size: 15px; text-transform: uppercase; letter-spacing: 1px; text-align: center; }
+    .summary-value { font-size: 30px; font-weight: 600; line-height: 1.1; }
+    .summary-value.green { color: #35B835; }
+    .summary-value.gray { color: #8BA5B5; }
+    .summary-value.purple { color: #B06CF7; }
+    .summary-value.blue { color: rgb(96,175,234); }
+    .summary-sub { color: #8BA5B5; font-size: 15px; text-align: center; line-height: 1.1; }
+
+    .legend-card { background: #243E4B; border-radius: 8px; padding: 4px 10px; flex: 0.3; }
+    .legend-row { display: flex; align-items: center; gap: 5px; font-size: 15px; color: #c8d8e4; margin-bottom: 2px; }
+    .legend-row:last-child { margin-bottom: 0; }
+    .legend-dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+    .legend-dot.l-empty { background: rgba(53,184,53,0.35); border: 1px solid #35B835; }
+    .legend-dot.l-used { background: rgba(139,165,181,0.2); border: 1px solid #8BA5B5; }
+    .legend-dot.l-special { background: rgba(176,108,247,0.3); border: 1px solid #B06CF7; }
+
+    .special-card { background: #243E4B; border-radius: 8px; padding: 6px 10px; border-left: 3px solid #B06CF7; flex: 1; animation: cardBlink 3s ease-in-out infinite; }
+    .special-title { color: #B06CF7; font-size: 22px; font-weight: 600; margin-bottom: 4px; }
+    .special-detail { color: #c8d8e4; font-size: 15px; line-height: 1.5; }
+
+    @keyframes cardBlink {
+        0%, 100% { border-left-color: rgba(176,108,247,0.4); }
+        50% { border-left-color: rgba(176,108,247,1); }
+    }
+
+    /* Utilization ring */
+    .util-card { background: #243E4B; border-radius: 8px; padding: 2px; display: flex; flex-direction: column; align-items: center; flex: 0.5; }
+    .util-ring-wrap { display: flex; align-items: center; justify-content: center; flex: 1; width: 100%; }
+    .util-ring-svg { width: 100%; max-width: 100px; }
+
+    /* Right: Grid */
+    .right-panel { flex: 1; display: flex; align-items: stretch; justify-content: flex-end; overflow: hidden; padding-left: 1%; }
+
+    .grid-wrapper { display: flex; flex-direction: column; width: 100%; height: 100%; }
+
+    /* Column labels */
+    .col-labels { display: grid; gap: 1px; margin-bottom: 2px; grid-template-columns: var(--label-w) repeat(16, 1fr); }
+    .col-label-spacer { }
+    .col-label { text-align: center; color: #8BA5B5; font-size: 11px; font-weight: 600; display: flex; align-items: center; justify-content: center; }
+
+    /* Grid rows */
+    .storage-grid { display: flex; flex-direction: column; gap: 1px; flex: 1; min-height: 0; }
+    .grid-row { display: grid; gap: 1px; flex: 1; min-height: 0; grid-template-columns: var(--label-w) repeat(16, 1fr); }
+    .row-label { color: #8BA5B5; font-size: 11px; font-weight: 600; display: flex; align-items: center; justify-content: flex-end; padding-right: 4px; }
+
+    .cell { border-radius: 3px; display: flex; align-items: center; justify-content: center; font-weight: 600; transition: all 0.2s; cursor: default; position: relative; width: 100%; height: 100%; }
+    .cell.empty { background: rgba(53,184,53,0.18); border: 1px solid rgba(53,184,53,0.35); color: #35B835; }
+    .cell.empty:hover { background: rgba(53,184,53,0.35); border-color: #35B835; z-index: 2; }
+    .cell.used { background: rgba(139,165,181,0.12); border: 1px solid rgba(139,165,181,0.25); color: #8BA5B5; }
+    .cell.used:hover { background: rgba(139,165,181,0.25); border-color: #8BA5B5; z-index: 2; }
+    .cell.special { background: rgba(176,108,247,0.2); border: 1px solid rgba(176,108,247,0.45); color: #B06CF7; animation: specialBlink 3s ease-in-out infinite; }
+    .cell.special:hover { background: rgba(176,108,247,0.4); border-color: #B06CF7; z-index: 3; animation: none; }
+
+    @keyframes specialBlink {
+        0%, 100% { background: rgba(176,108,247,0.2); border-color: rgba(176,108,247,0.45); }
+        50% { background: rgba(176,108,247,0.55); border-color: rgba(176,108,247,0.9); }
+    }
+
+    /* Tooltip */
+    .cell-tooltip { display: none; position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%); background: #1a2e3a; border: 1px solid #0f1f2a; border-radius: 6px; padding: 6px 10px; white-space: nowrap; z-index: 100; font-size: 11px; color: #c8d8e4; pointer-events: none; }
+    .cell-tooltip::after { content: ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%); border: 4px solid transparent; border-top-color: #1a2e3a; }
+    .cell:hover .cell-tooltip { display: block; }
+</style>
+</head>
+<body>
+
+<div class="header">
+    <span class="header-title">物料儲位看板</span>
+    <div class="header-datetime" id="headerDatetime"></div>
+</div>
+
+<div class="main-layout">
+    <!-- Left: Summary -->
+    <div class="summary-col">
+        <div class="summary-card">
+            <div class="summary-label">總儲位</div>
+            <div class="summary-value blue" id="sumTotal">0</div>
+            <div class="summary-sub">位</div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-label">已使用</div>
+            <div class="summary-value gray" id="sumUsed">0</div>
+            <div class="summary-sub" id="sumUsedPct"></div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-label">空位</div>
+            <div class="summary-value green" id="sumEmpty">0</div>
+            <div class="summary-sub" id="sumEmptyPct"></div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-label">出庫中</div>
+            <div class="summary-value purple" id="sumSpecial">0</div>
+            <div class="summary-sub" id="sumSpecialSub"></div>
+        </div>
+        <div class="util-card" style="flex:0.6;">
+            <div class="summary-label" style="margin-bottom:2px;">使用率</div>
+            <div class="util-ring-wrap">
+                <svg class="util-ring-svg" viewBox="0 0 120 120" id="utilRingSvg">
+                    <circle cx="60" cy="60" r="48" fill="none" stroke="rgba(139,165,181,0.12)" stroke-width="12"/>
+                    <circle cx="60" cy="60" r="48" fill="none" stroke="#8BA5B5" stroke-width="12"
+                        stroke-dasharray="301.6" stroke-dashoffset="301.6" stroke-linecap="round"
+                        transform="rotate(-90 60 60)" id="utilRingFill"/>
+                    <text x="60" y="56" text-anchor="middle" fill="#fff" font-size="22" font-weight="700" font-family="Biome" id="utilRingText">0%</text>
+                    <text x="60" y="74" text-anchor="middle" fill="#8BA5B5" font-size="10" font-family="Biome">使用率</text>
+                </svg>
+            </div>
+        </div>
+        <div class="legend-card">
+            <div class="legend-row"><div class="legend-dot l-empty"></div>空位 (可入庫)</div>
+            <div class="legend-row"><div class="legend-dot l-used"></div>已使用</div>
+            <div class="legend-row"><div class="legend-dot l-special"></div>正在出庫</div>
+        </div>
+        <div class="special-card" id="specialCard">
+            <div class="special-title">正在出庫</div>
+            <div class="special-detail" id="specialDetail">暫無</div>
+        </div>
+    </div>
+
+    <!-- Right: Grid -->
+    <div class="right-panel" id="rightPanel">
+        <div class="grid-wrapper" id="gridWrapper">
+            <div class="col-labels" id="colLabels"></div>
+            <div class="storage-grid" id="storageGrid"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+// ==================== CONFIG ====================
+const ROWS = 16;
+const COLS = 16;
+const REFRESH_INTERVAL = 60000;
+
+// ==================== MOCK DATA ====================
+function generateMockData() {
+    const grid = [];
+    for (let r = 0; r < ROWS; r++) {
+        const row = [];
+        const rowNum = r + 1;
+        for (let c = 0; c < COLS; c++) {
+            if (rowNum <= 10 && c < 5) {
+                if (rowNum === 4 && c === 0) {
+                    row.push({ state: 'special', material: 'PCB-MAIN-2045', qty: 32, capacity: 50, location: 'A4-01' });
+                } else {
+                    row.push({ state: 'used', material: 'PCB-SUB-' + (1000 + rowNum * 100 + c), qty: 10 + Math.floor(Math.random() * 30), capacity: 50, location: 'A' + rowNum + '-' + String(c + 1).padStart(2, '0') });
+                }
+            } else {
+                row.push({ state: 'empty', material: '', qty: 0, capacity: 50, location: 'A' + rowNum + '-' + String(c + 1).padStart(2, '0') });
+            }
+        }
+        grid.push(row);
+    }
+    return grid;
+}
+
+// ==================== LAYOUT CALC ====================
+function layoutGrid() {
+    const panel = document.getElementById('rightPanel');
+    const availW = panel.clientWidth;
+    const availH = panel.clientHeight;
+
+    const labelW = 32;
+    const labelH = 20;
+    const hGaps = COLS;
+    const vGaps = ROWS;
+
+    const cellAvailW = (availW - labelW - hGaps) / COLS;
+    const cellAvailH = (availH - labelH - vGaps) / ROWS;
+
+    const gridW = document.getElementById('gridWrapper');
+    gridW.style.setProperty('--label-w', labelW + 'px');
+
+    // Font size based on smaller dimension
+    const fontSize = Math.max(7, Math.min(13, Math.min(cellAvailW, cellAvailH) * 0.35));
+    gridW.style.setProperty('--cell-font', fontSize + 'px');
+    return fontSize;
+}
+
+// ==================== RENDER ====================
+function render(gridData) {
+    const fontSize = layoutGrid();
+
+    let totalCells = ROWS * COLS;
+    let usedCount = 0, emptyCount = 0, specialCount = 0;
+    let specialItems = [];
+
+    gridData.forEach(row => {
+        row.forEach(cell => {
+            if (cell.state === 'used') usedCount++;
+            else if (cell.state === 'empty') emptyCount++;
+            else if (cell.state === 'special') { specialCount++; specialItems.push(cell); }
+        });
+    });
+
+    // Summary
+    document.getElementById('sumTotal').textContent = totalCells;
+    document.getElementById('sumUsed').textContent = usedCount;
+    document.getElementById('sumUsedPct').textContent = Math.round(usedCount / totalCells * 100) + '%';
+    document.getElementById('sumEmpty').textContent = emptyCount;
+    document.getElementById('sumEmptyPct').textContent = Math.round(emptyCount / totalCells * 100) + '%';
+    document.getElementById('sumSpecial').textContent = specialCount;
+    document.getElementById('sumSpecialSub').textContent = specialCount > 0 ? '正在出庫' : '無';
+
+    // Utilization ring
+    const utilPct = Math.round((usedCount + specialCount) / totalCells * 100);
+    const circumference = 2 * Math.PI * 48;
+    const offset = circumference - (circumference * utilPct / 100);
+    const ringFill = document.getElementById('utilRingFill');
+    ringFill.setAttribute('stroke-dashoffset', offset);
+    let ringColor = '#8BA5B5';
+    if (utilPct > 80) ringColor = 'rgb(240,193,68)';
+    else if (utilPct < 40) ringColor = '#35B835';
+    ringFill.setAttribute('stroke', ringColor);
+    document.getElementById('utilRingText').textContent = utilPct + '%';
+
+    // Special info
+    if (specialItems.length > 0) {
+        const s = specialItems[0];
+        document.getElementById('specialDetail').innerHTML =
+            '<div style="color:#B06CF7;font-weight:600;font-size:12px;">' + esc(s.location) + '</div>' +
+            '<div>物料：' + esc(s.material) + '</div>' +
+            '<div>數量：<b style="color:#fff">' + s.qty + '</b> / ' + s.capacity + '</div>' +
+            '<div>剩餘：<b style="color:#35B835">' + (s.capacity - s.qty) + '</b></div>';
+    } else {
+        document.getElementById('specialDetail').textContent = '暫無出庫中物料';
+    }
+
+    // Column labels
+    const colLabelsEl = document.getElementById('colLabels');
+    colLabelsEl.innerHTML = '';
+    colLabelsEl.style.gridTemplateColumns = 'var(--label-w) repeat(' + COLS + ', 1fr)';
+    const spacer = document.createElement('div');
+    spacer.className = 'col-label-spacer';
+    colLabelsEl.appendChild(spacer);
+    for (let c = 0; c < COLS; c++) {
+        const lbl = document.createElement('div');
+        lbl.className = 'col-label';
+        lbl.textContent = String(c + 1).padStart(2, '0');
+        colLabelsEl.appendChild(lbl);
+    }
+
+    // Grid rows
+    const gridEl = document.getElementById('storageGrid');
+    gridEl.innerHTML = '';
+
+    gridData.forEach((row, rIdx) => {
+        const rowEl = document.createElement('div');
+        rowEl.className = 'grid-row';
+
+        const label = document.createElement('div');
+        label.className = 'row-label';
+        label.textContent = 'A' + (rIdx + 1);
+        rowEl.appendChild(label);
+
+        row.forEach(cell => {
+            const cellEl = document.createElement('div');
+            cellEl.className = 'cell ' + cell.state;
+            cellEl.style.fontSize = fontSize + 'px';
+
+            if (cell.state === 'used') {
+                cellEl.textContent = cell.qty;
+            } else if (cell.state === 'special') {
+                cellEl.textContent = '出';
+            }
+
+            // Tooltip
+            const tooltip = document.createElement('div');
+            tooltip.className = 'cell-tooltip';
+            if (cell.state === 'used') {
+                tooltip.innerHTML = '<b>' + esc(cell.location) + '</b><br>物料：' + esc(cell.material) + '<br>數量：' + cell.qty + ' / ' + cell.capacity;
+            } else if (cell.state === 'special') {
+                tooltip.innerHTML = '<b style="color:#B06CF7">' + esc(cell.location) + ' 出庫中</b><br>物料：' + esc(cell.material) + '<br>數量：' + cell.qty + ' / ' + cell.capacity + '<br>剩餘：' + (cell.capacity - cell.qty);
+            } else {
+                tooltip.innerHTML = '<b>' + esc(cell.location) + '</b><br>空位可入庫';
+            }
+            cellEl.appendChild(tooltip);
+            rowEl.appendChild(cellEl);
+        });
+
+        gridEl.appendChild(rowEl);
+    });
+}
+
+function esc(s) {
+    if (!s) return '';
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ==================== LOAD ====================
+function loadData() {
+    const mockData = generateMockData();
+    render(mockData);
+}
+loadData();
+setInterval(loadData, REFRESH_INTERVAL);
+
+// ==================== RESIZE ====================
+window.addEventListener('resize', () => { loadData(); });
+
+// ==================== HEADER DATETIME ====================
+function updateDatetime() {
+    const now = new Date();
+    document.getElementById('headerDatetime').textContent =
+        now.getFullYear() + '/' + String(now.getMonth()+1).padStart(2,'0') + '/' + String(now.getDate()).padStart(2,'0') + '  ' +
+        String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0') + ':' + String(now.getSeconds()).padStart(2,'0');
+}
+updateDatetime();
+setInterval(updateDatetime, 1000);
+</script>
+</body>
+</html>

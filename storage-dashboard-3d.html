@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>儲位看板</title>
+<style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    @font-face { font-family: 'Biome'; src: url('//pdash01.tb.pegatroncorp.com/BiomeW04-Wide.woff2') format('woff2'); font-weight: normal; font-style: normal; }
+    body { font-family: 'Biome', 'Segoe UI', sans-serif; background-color: #082334; width: 100%; height: 100vh; padding: 56px 20px 20px 20px; box-sizing: border-box; position: relative; overflow: hidden; }
+
+    .header { position: absolute; left: 0; top: 0; width: 100%; height: 56px; display: flex; align-items: center; padding-left: 20px; }
+    .header-title { font-size: 24px; color: #fff; letter-spacing: 2px; }
+    .header-sub { font-size: 13px; color: #60AFEA; opacity: 0.75; margin-left: 14px; letter-spacing: 1px; }
+    .header-datetime { margin-left: auto; margin-right: 20px; color: rgb(96,175,234); font-size: 14px; opacity: 0.8; }
+
+    .main-layout { width: 100%; height: 100%; display: flex; gap: 8px; }
+
+    /* Left: Summary cards (same as 2D) */
+    .summary-col { width: 300px; display: flex; flex-direction: column; gap: 3px; flex-shrink: 0; }
+    .summary-wh { background: #142a36; border: 1px solid #2e4c60; border-radius: 8px; padding: 6px 10px; color: #ffd866; font-size: 14px; font-weight: 600; text-align: center; letter-spacing: 1px; }
+    .summary-wh small { color: #7fa0b4; font-weight: 400; display: block; font-size: 12px; margin-top: 2px; }
+    .summary-card { background: #243E4B; border-radius: 8px; padding: 4px 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; }
+    .summary-label { color: #8BA5B5; font-size: 15px; text-transform: uppercase; letter-spacing: 1px; text-align: center; }
+    .summary-value { font-size: 30px; font-weight: 600; line-height: 1.1; }
+    .summary-value.green { color: #35B835; }
+    .summary-value.gray { color: #8BA5B5; }
+    .summary-value.purple { color: #B06CF7; }
+    .summary-value.blue { color: rgb(96,175,234); }
+    .summary-sub { color: #8BA5B5; font-size: 15px; text-align: center; line-height: 1.1; }
+
+    .util-card { background: #243E4B; border-radius: 8px; padding: 2px; display: flex; flex-direction: column; align-items: center; flex: 0.55; }
+    .util-ring-wrap { display: flex; align-items: center; justify-content: center; flex: 1; width: 100%; }
+    .util-ring-svg { width: 100%; max-width: 110px; }
+
+    .legend-card { background: #243E4B; border-radius: 8px; padding: 4px 10px; flex: 0.32; }
+    .legend-row { display: flex; align-items: center; gap: 5px; font-size: 15px; color: #c8d8e4; margin-bottom: 2px; }
+    .legend-row:last-child { margin-bottom: 0; }
+    .legend-dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+    .legend-dot.l-empty { background: rgba(156,122,69,0.55); border: 1px solid #b8935a; }
+    .legend-dot.l-used { background: rgba(139,165,181,0.2); border: 1px solid #8BA5B5; }
+    .legend-dot.l-special { background: rgba(176,108,247,0.3); border: 1px solid #B06CF7; }
+    .legend-row.l-walk { color: #8BA5B5; }
+    .legend-dot.l-walk { background: rgba(118,130,140,0.5); border: 1px dashed #9aa6b0; }
+    .legend-inline { display: flex; align-items: center; gap: 10px; white-space: nowrap; }
+    .legend-inline .lg { display: inline-flex; align-items: center; gap: 4px; }
+    .legend-inline .legend-dot { width: 9px; height: 9px; }
+
+    .special-card { background: #243E4B; border-radius: 8px; padding: 6px 10px; border-left: 3px solid #B06CF7; flex: 2.1; animation: cardBlink 3s ease-in-out infinite; overflow: auto; }
+    .special-title { color: #B06CF7; font-size: 22px; font-weight: 600; margin-bottom: 4px; }
+    .special-detail { color: #c8d8e4; font-size: 15px; line-height: 1.5; }
+    .special-detail.special-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 6px; align-items: center; }
+
+    @keyframes cardBlink {
+        0%, 100% { border-left-color: rgba(176,108,247,0.4); }
+        50% { border-left-color: rgba(176,108,247,1); }
+    }
+
+    /* Center: 3D viewport */
+    .view3d-panel { flex: 1; min-width: 0; position: relative; background: #0b1e2a; border: 1px solid #1c3646; border-radius: 8px; overflow: hidden; }
+    .view3d-panel canvas { display: block; }
+
+    .view-controls { display: flex; align-items: center; gap: 6px; z-index: 10; margin-left: 18px; flex-wrap: nowrap; }
+    .ctrl-chip { background: rgba(13,31,42,0.85); border: 1px solid #2a4657; color: #c8d8e4; border-radius: 6px; padding: 5px 12px; font-size: 13px; cursor: pointer; user-select: none; transition: all 0.15s; white-space: nowrap; }
+    .ctrl-chip:hover { border-color: #60AFEA; color: #fff; }
+    .ctrl-chip.active { background: #16384a; border-color: #60AFEA; color: #7fc4f5; box-shadow: 0 0 8px rgba(96,175,234,0.35); }
+    .ctrl-chip.ctrl-readonly { cursor: default; }
+    /* 料號搜尋（輸入框＋結果下拉） */
+    .ctrl-search { position: relative; padding: 0; }
+    .ctrl-search input {
+        background: rgba(10,24,34,0.9); border: none; outline: none;
+        color: #e8f2f8; font-size: 15px; padding: 8px 14px; width: 260px; border-radius: 6px; font-family: inherit;
+    }
+    .ctrl-search input::placeholder { color: #5c7d90; }
+    .ctrl-search input:focus { box-shadow: 0 0 0 1px #60AFEA inset; }
+    .search-results {
+        position: absolute; left: 0; top: calc(100% + 6px); width: 420px; max-height: 320px; overflow: auto;
+        background: rgba(13,31,42,0.96); border: 1px solid #2a4657; border-radius: 6px; z-index: 30;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    }
+    .search-result {
+        padding: 6px 10px; cursor: pointer; border-bottom: 1px solid rgba(42,70,87,0.4); white-space: nowrap;
+    }
+    .search-result:hover { background: #16384a; }
+    .search-result .sr-loc { color: #7fc4f5; font-weight: 700; margin-right: 8px; }
+    .search-result .sr-item { color: #e8f2f8; }
+    .search-result .sr-nm { color: #8aa3b3; margin-left: 6px; font-size: 12px; }
+    .search-result .sr-qty { color: #ffd866; margin-left: auto; }
+    .search-empty { padding: 8px 10px; color: #8aa3b3; }
+
+    .view-note { position: absolute; left: 12px; bottom: 10px; color: #5c7d90; font-size: 12px; z-index: 10; }
+
+    /* 羅盤（東南西北） */
+    .compass { position: absolute; right: 14px; bottom: 12px; z-index: 12; display: flex; flex-direction: column; align-items: center; gap: 2px; pointer-events: none; }
+    .compass-ring { position: relative; width: 64px; height: 64px; border-radius: 50%; background: rgba(13,31,42,0.9); border: 1px solid #3a5a6f; box-shadow: 0 4px 16px rgba(0,0,0,0.5); }
+    .compass-needle { position: absolute; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px 0 0 -3px; transition: transform 0.12s linear; }
+    .compass-needle::before { content: ''; position: absolute; left: 50%; bottom: 50%; width: 2px; height: 22px; margin-left: -1px; background: #ffd866; clip-path: polygon(50% 0, 100% 100%, 0 100%); transform-origin: 50% 100%; }
+    .compass-needle .compass-nlab { position: absolute; left: 50%; bottom: calc(50% + 24px); transform: translateX(-50%); color: #ffd866; font-size: 11px; font-weight: 700; letter-spacing: 1px; white-space: nowrap; }
+    .compass-card { position: absolute; inset: 0; color: #8BA5B5; font-size: 10px; letter-spacing: 1px; }
+    .compass-card .n { position: absolute; top: 3px; left: 0; right: 0; text-align: center; color: #ffd866; font-weight: 700; }
+    .compass-card .s { position: absolute; bottom: 3px; left: 0; right: 0; text-align: center; }
+    .compass-card .e { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); }
+    .compass-card .w { position: absolute; left: 5px; top: 50%; transform: translateY(-50%); }
+    .compass-hint { color: #5c7d90; font-size: 11px; text-align: center; line-height: 1.3; }
+
+    /* 儲位明細 Modal 表格 */
+    .loc-modal { position: fixed; inset: 0; background: rgba(5,16,24,0.55); display: none; align-items: center; justify-content: center; z-index: 60; }
+    .loc-modal.show { display: flex; }
+    .loc-modal-panel { background: #0d1f2a; border: 1px solid #3a5a6f; border-radius: 10px; min-width: 680px; max-width: 94vw; max-height: 86vh; overflow: auto; padding: 16px 18px; box-shadow: 0 10px 40px rgba(0,0,0,.6); }
+    .loc-modal-title { color: #fff; font-size: 20px; margin-bottom: 4px; }
+    .loc-modal-sub { color: #8BA5B5; font-size: 13px; margin-bottom: 10px; }
+    .loc-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.loc-table th { color: #7fc4f5; text-align: left; padding: 6px 8px; border-bottom: 1px solid #2a4657; white-space: nowrap; }
+.loc-table td { color: #c8d8e4; padding: 6px 8px; border-bottom: 1px solid #1c3646; }
+.loc-table .loc-lvhead td { background: rgba(43,84,110,.45); color: #ffd866; font-weight: 700; border-bottom: 1px solid #2a4657; }
+.loc-table tr:hover td { background: #122a3a; }
+.loc-table .loc-lvhead:hover td { background: rgba(43,84,110,.45); }
+    .loc-empty { color: #35B835; padding: 18px 8px; font-size: 14px; }
+    .loc-close { float: right; color: #8BA5B5; cursor: pointer; font-size: 18px; line-height: 1; }
+    .loc-close:hover { color: #fff; }
+
+    /* 穿透設定 選單 */
+    .ghost-menu { position: absolute; display: none; background: rgba(13,31,42,0.96); border: 1px solid #3a5a6f; border-radius: 8px; padding: 8px 10px; z-index: 55; font-size: 13px; color: #c8d8e4; min-width: 190px; box-shadow: 0 6px 24px rgba(0,0,0,.55); }
+    .ghost-menu .gh-title { color: #7fc4f5; font-weight: 700; margin-bottom: 6px; }
+    .ghost-menu .gh-btn { display: block; width: 100%; text-align: left; background: #16384a; border: 1px solid #2a4657; color: #c8d8e4; border-radius: 6px; padding: 5px 9px; margin-top: 5px; cursor: pointer; font-size: 13px; }
+    .ghost-menu .gh-btn:hover { border-color: #60AFEA; color: #fff; }
+    .ghost-menu .gh-state { margin-top: 5px; color: #8BA5B5; font-size: 12px; }
+
+    /* Tooltip */
+    .cell-tooltip { position: absolute; display: none; background: rgba(13,31,42,0.96); border: 1px solid #3a5a6f; border-radius: 6px; padding: 8px 12px; z-index: 50; font-size: 12px; color: #c8d8e4; line-height: 1.55; pointer-events: none; box-shadow: 0 4px 16px rgba(0,0,0,0.5); white-space: nowrap; }
+    .cell-tooltip b.loc { color: #fff; font-size: 13px; }
+
+    /* Info panel (selected cell) */
+    .info-panel { position: absolute; right: 12px; top: 12px; width: 230px; background: rgba(13,31,42,0.9); border: 1px solid #2a4657; border-radius: 8px; padding: 10px 14px; z-index: 10; font-size: 13px; color: #c8d8e4; }
+    .info-panel .ip-title { color: #8BA5B5; font-size: 12px; letter-spacing: 1px; margin-bottom: 6px; }
+    .info-panel .ip-row { display: flex; justify-content: space-between; margin-bottom: 3px; line-height: 1.5; }
+    .info-panel .ip-row b { color: #fff; font-weight: 600; text-align: right; }
+    .info-panel .ip-empty { color: #5c7d90; font-size: 12px; }
+/* 第一人稱 UI */
+#fpsCrosshair { position:absolute; left:50%; top:50%; width:20px; height:20px; transform:translate(-50%,-50%); display:none; z-index:40; pointer-events:none; }
+#fpsCrosshair::before { content:''; position:absolute; left:50%; top:0; bottom:0; width:2px; margin-left:-1px; background:rgba(255,216,102,.9); }
+#fpsCrosshair::after { content:''; position:absolute; top:50%; left:0; right:0; height:2px; margin-top:-1px; background:rgba(255,216,102,.9); }
+#fpsInteract { position:absolute; left:50%; top:60%; transform:translateX(-50%); display:none; background:rgba(13,31,42,.92); border:1px solid #ffd866; color:#ffd866; border-radius:6px; padding:5px 14px; font-size:15px; z-index:40; pointer-events:none; letter-spacing:1px; }
+#fpsLockHint { position:absolute; inset:0; display:none; align-items:center; justify-content:center; background:rgba(5,16,24,.6); color:#c8d8e4; font-size:16px; text-align:center; line-height:2; z-index:45; pointer-events:none; }
+#fpsLockHint b { color:#ffd866; }
+/* 第一人稱 9 格物品欄 */
+.inv-hotbar { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); display: none; gap: 5px; z-index: 40; padding: 6px; background: rgba(8,18,26,0.82); border: 1px solid #2a4657; border-radius: 10px; }
+.inv-hotbar.show { display: flex; }
+.inv-slot { position: relative; width: 46px; height: 46px; background: rgba(16,32,44,0.95); border: 1px solid #2a4657; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.inv-slot.sel { border-color: #ffd866; box-shadow: 0 0 0 1px #ffd866 inset, 0 0 10px rgba(255,216,102,.35); }
+.inv-slot .inv-key { position: absolute; top: 1px; left: 4px; font-size: 9px; color: #5c7d90; }
+.inv-slot.sel .inv-key { color: #ffd866; }
+.inv-empty { font-size: 16px; color: #22394a; }
+.inv-box { width: 22px; height: 20px; background: linear-gradient(180deg, #e2ae6e 0%, #c68c4a 100%); border: 1px solid #8a5a26; border-radius: 3px; position: relative; }
+.inv-box::after { content: ''; position: absolute; left: 2px; right: 2px; top: 40%; height: 1px; background: rgba(120,78,32,.7); box-shadow: 0 3px 0 rgba(120,78,32,.5); }
+.inv-qty { position: absolute; right: 3px; bottom: 1px; font-size: 11px; font-weight: 700; color: #fff; text-shadow: 0 1px 2px #000; }
+.inv-toast { position: absolute; left: 50%; top: 62%; transform: translateX(-50%); display: none; background: rgba(13,31,42,.95); border: 1px solid #4cd64c; color: #4cd64c; border-radius: 8px; padding: 8px 22px; font-size: 15px; font-weight: 700; z-index: 50; letter-spacing: 1px; pointer-events: none; box-shadow: 0 6px 22px rgba(0,0,0,.55); }
+.inv-toast.err { border-color: #ff6b6b; color: #ff6b6b; }
+/* 第一人稱 右手：CSS 視圖模型（Minecraft 方塊風格，固定畫面右下，任何瀏覽器/比例都顯示） */
+/* Minecraft 式第一人稱右手：大藍袖手臂＋大拳頭，佔右下角、整體微傾向準星 */
+#fpsHand { position:absolute; inset:0; display:none; z-index:41; pointer-events:none; transform-origin:100% 14%; }
+#fpsHand.on { display:block; }
+#fpsHand .fh-arm {
+    position:absolute; right:-1.2vw; bottom:-8vh; width:13vw; height:70vh;
+    transform-origin:50% 18%;
+    background:linear-gradient(90deg,#5f93d4 0%, #3a6fb5 55%, #27508c 100%);
+    border:0.4vw solid #1f457a; border-top-width:0.6vw; border-radius:1.4vw;
+    box-shadow: inset -2.6vw 0 0 rgba(0,0,0,.26), inset 0.8vw 0 0 rgba(255,255,255,.10);
+}
+#fpsHand .fh-cuff {
+    position:absolute; right:-0.6vw; bottom:42vh; width:14vw; height:3.2vw;
+    background:#2c5a94; border:0.32vw solid #1a3f70; border-radius:1vw;
+    box-shadow: inset 0 -0.8vw 0 rgba(0,0,0,.28);
+}
+#fpsHand .fh-fi {
+    position:absolute; right:0vw; bottom:6vh; width:15vw; height:15vw;
+    background:radial-gradient(circle at 38% 32%, #efd3a8, #d8a877 68%, #bd8c59);
+    border:0.45vw solid #a3744a; border-radius:2vw;
+    box-shadow: inset -3vw -2.4vw 0 rgba(0,0,0,.30), inset 1.6vw 1.2vw 0 rgba(255,255,255,.14);
+}
+#fpsHand .fh-fi::before {  /* 指縫 */
+    content:''; position:absolute; top:46%; left:0; right:0; height:2.6vw;
+    background:repeating-linear-gradient(90deg, transparent 0 3vw, rgba(122,84,51,.85) 3vw 3.3vw);
+}
+#fpsHand .fh-thumb {
+    position:absolute; right:4.4vw; bottom:14vh; width:8vw; height:11vw;
+    background:linear-gradient(90deg,#ecd0a6,#cfa06c);
+    border:0.4vw solid #96683f; border-radius:1.6vw; transform:rotate(-14deg);
+    box-shadow: inset -1.6vw 0 0 rgba(0,0,0,.22);
+}
+/* 手持物品（熱鍵欄選中項）：拳頭上緣、向準星延伸 */
+#fpsHand .fh-hold { position:absolute; right:15vw; bottom:27vh; width:11vw; height:11vw; display:none; }
+#fpsHand .fh-hold.on { display:block; }
+#fpsHand .fh-hold .hld-body {
+    position:absolute; inset:0;
+    background:linear-gradient(135deg,#cfa778, #b98a5e 55%, #9d7147);
+    border:0.35vw solid #7d5a38; border-radius:1vw;
+    box-shadow: inset -2.2vw -1.5vw 0 rgba(0,0,0,.28), inset 1.1vw 1vw 0 rgba(255,255,255,.12);
+}
+#fpsHand .fh-hold .hld-tag {
+    position:absolute; left:50%; bottom:135%; transform:translateX(-50%);
+    white-space:nowrap; background:rgba(6,15,24,.94); border:1px solid #ffd866; color:#ffd866;
+    font-size:2.4vh; padding:0.4vh 1vh; border-radius:0.8vh; letter-spacing:.5px;
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+    <div class="view-controls">
+        <div class="ctrl-chip" id="btnRotate">自動旋轉</div>
+        <div class="ctrl-chip" id="btnRefresh">重新整理</div>
+        <div class="ctrl-chip" id="btnGhost">穿透設定</div>
+        <div class="ctrl-chip" id="fl1">1L</div>
+        <div class="ctrl-chip active" id="fl2">2L</div>
+        <div class="ctrl-chip" id="fl3">3L</div>
+        <div class="ctrl-chip" id="whA">A 倉</div>
+        <div class="ctrl-chip" id="whB">B 倉</div>
+        <div class="ctrl-chip active" id="whC">C 倉</div>
+        <div class="ctrl-chip" id="whD">D 倉</div>
+        <div class="ctrl-chip" id="whAll">ALL</div>
+        <div class="ctrl-chip" id="whR" style="display:none">原料倉</div>
+        <div class="ctrl-chip" id="whG" style="display:none">成品倉</div>
+        <div class="ctrl-chip" id="btnFps">第一人稱</div>
+        <div class="ctrl-chip" id="btnGesture">📷 手勢</div>
+        <div class="ctrl-chip ctrl-search" id="searchWrap">
+            <input id="searchInput" placeholder="搜尋 料號／儲位／SO／箱號…" autocomplete="off" spellcheck="false">
+            <div class="search-results" id="searchResults" style="display:none;"></div>
+        </div>
+    </div>
+    <div class="header-datetime" id="headerDatetime"></div>
+</div>
+
+<div class="main-layout">
+    <!-- Left: Summary -->
+        <div class="summary-col">
+            <div class="summary-wh" id="summaryWh">目前倉別：C 倉（儲位看板）<small>鏡頭往南移可切到 D 倉（SEMS 鋼架庫）</small></div>
+            <div class="summary-card">
+            <div class="summary-label">總儲位</div>
+            <div class="summary-value blue" id="sumTotal">0</div>
+            <div class="summary-sub" id="sumTotalSub"></div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-label">已使用</div>
+            <div class="summary-value gray" id="sumUsed">0</div>
+            <div class="summary-sub" id="sumUsedPct"></div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-label">空位</div>
+            <div class="summary-value green" id="sumEmpty">0</div>
+            <div class="summary-sub" id="sumEmptyPct"></div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-label">出庫中</div>
+            <div class="summary-value purple" id="sumSpecial">0</div>
+            <div class="summary-sub" id="sumSpecialSub"></div>
+        </div>
+        <div class="util-card">
+            <div class="summary-label" style="margin-bottom:2px;">使用率</div>
+            <div class="util-ring-wrap">
+                <svg class="util-ring-svg" viewBox="0 0 120 120" id="utilRingSvg">
+                    <circle cx="60" cy="60" r="48" fill="none" stroke="rgba(139,165,181,0.12)" stroke-width="12"/>
+                    <circle cx="60" cy="60" r="48" fill="none" stroke="#8BA5B5" stroke-width="12"
+                        stroke-dasharray="301.6" stroke-dashoffset="301.6" stroke-linecap="round"
+                        transform="rotate(-90 60 60)" id="utilRingFill"/>
+                    <text x="60" y="56" text-anchor="middle" fill="#fff" font-size="22" font-weight="700" font-family="Biome" id="utilRingText">0%</text>
+                    <text x="60" y="74" text-anchor="middle" fill="#8BA5B5" font-size="10" font-family="Biome">使用率</text>
+                </svg>
+            </div>
+        </div>
+        <div class="special-card">
+            <div class="special-title">正在出庫</div>
+            <div class="special-detail" id="specialDetail">暫無</div>
+        </div>
+    </div>
+
+    <!-- Center: 3D viewport -->
+    <div class="view3d-panel" id="view3d">
+        <video id="gestCam" style="position:absolute;right:10px;bottom:10px;width:150px;border-radius:6px;border:1px solid #2f6feb;background:#000;display:none;z-index:60;"></video>
+        <canvas id="gestCanvas" width="320" height="240" style="position:absolute;right:10px;bottom:10px;width:150px;height:112.5px;border-radius:6px;pointer-events:none;display:none;z-index:61;"></canvas>
+        <div id="gestStatus" style="position:absolute;right:10px;bottom:170px;font-size:11px;color:#7fd1a0;background:rgba(10,20,30,.7);padding:2px 8px;border-radius:4px;display:none;z-index:60;"></div>
+        <div class="info-panel" id="infoPanel">
+            <div class="ip-title">已選儲位</div>
+            <div class="ip-empty" id="infoEmpty">點擊儲位查看明細</div>
+            <div id="infoBody" style="display:none;"></div>
+        </div>
+
+        <div class="view-note" id="viewerNote">上帝視角：左鍵拖曳旋轉 ｜ 滾輪縮放 ｜ Shift/右鍵拖曳平移 ｜ A/C/D 切倉 ｜ V 第一人稱（WASD＋滑鼠拖曳轉視野）</div>
+        <div class="cell-tooltip" id="cellTooltip"></div>
+        <div class="ghost-menu" id="ghostMenu">
+            <div class="gh-title" id="ghostTitle">—</div>
+            <button class="gh-btn" id="ghostSingle">此物件：透明／還原</button>
+            <button class="gh-btn" id="ghostCat">整類：透明／還原</button>
+            <button class="gh-btn" id="ghostAll">全部還原</button>
+            <div class="gh-state" id="ghostState"></div>
+        </div>
+        <div class="loc-modal" id="locModal">
+            <div class="loc-modal-panel">
+                <span class="loc-close" id="locClose">✕</span>
+                <div class="loc-modal-title" id="locTitle">儲位明細</div>
+                <div class="loc-modal-sub" id="locSub"></div>
+                <table class="loc-table">
+                    <thead id="locHead"><tr>
+                        <th>箱號</th><th>料號</th><th>名稱</th><th>數量</th><th>Date Code</th><th>入庫時間</th>
+                    </tr></thead>
+                    <tbody id="locBody"></tbody>
+                </table>
+            </div>
+        </div>
+        <div class="compass" id="compass">
+            <div class="compass-ring">
+                <div class="compass-card">
+                    <span class="n">北</span><span class="s">南</span><span class="e">東</span><span class="w">西</span>
+                </div>
+                <div class="compass-needle" id="compassNeedle"><span class="compass-nlab" id="compassNlab">▴北</span></div>
+            </div>
+            <div class="compass-hint">倉內方向：北＝貨架區・南＝貨運區<br>接駁臺朝西・四周透明圍牆</div>
+        </div>
+        <!-- 第一人稱（V 切換；WASD＋滑鼠拖曳轉視野） -->
+        <div id="fpsCrosshair"></div>
+        <div id="fpsInteract">[ E 互動 ]</div>
+        <div id="fpsLockHint"><b style="color:#ffd866;font-size:22px;">第一人稱</b><br>WASD 移動 · Shift 加速 · 滑鼠拖曳轉視野 · <b>E</b> 拾取/放置 · 滾輪/1-9 換格 · 點擊查看儲位 · <b>V</b> 回到上帝視角</div>
+        <div class="inv-hotbar" id="invHotbar"></div>
+        <div class="inv-toast" id="invToast"></div>
+        <div id="fpsHand">
+            <div class="fh-cuff"></div>
+            <div class="fh-arm"></div>
+            <div class="fh-thumb"></div>
+            <div class="fh-fi"></div>
+            <div class="fh-hold"><div class="hld-body"></div><div class="hld-tag" id="fpsHoldTag"></div></div>
+        </div>
+        <div id="fpsHoldFloating" style="position:absolute; left:50%; bottom:24vh; transform:translateX(-50%); display:none; z-index:41; pointer-events:none; background:rgba(6,15,24,.94); border:1px solid #ffd866; color:#ffd866; font-size:2.4vh; padding:0.4vh 1vh; border-radius:0.8vh; letter-spacing:.5px;"></div>
+        <div id="webglFallback" style="display:none; position:absolute; inset:0; display:none; align-items:center; justify-content:center; color:#c8d8e4; font-size:16px; background:#0b1e2a; z-index:20;">此瀏覽器不支援 WebGL，無法顯示 3D 視圖</div>
+    </div>
+</div>
+
+<!-- 假資料版：攔截 fetch / WebSocket / MQTT，全用假資料（可離線）；真資料版不受影響 -->
+<script src="假資料.js?v=1"></script>
+<script src="lib/three.min.js"></script>
+
+    <!-- 看板核心＋各倉模組：每倉一個 JS（拆分重構） -->
+    <script src="核心.js?v=2026102111"></script>
+    <script src="2F-C倉.js?v=2026102109"></script>
+    <script src="2F-A倉.js?v=2026101408"></script>
+    <script src="2F-B倉.js?v=2026100832"></script>
+    <script src="成品倉.js?v=2026102106"></script>
+    <script src="原料倉.js?v=2026102107"></script>
+    <script src="2F-D倉.js?v=2026102101"></script>
+    <script src="2L倉.js?v=2026101006"></script>
+    <script src="3L倉.js?v=2026102102"></script>
+    <script src="3F-A倉.js?v=2026100835"></script>
+    <script src="3F-B倉.js?v=2026100836"></script>
+    <script src="3F-C倉.js?v=2026100837"></script>
+    <script src="3F-D倉.js?v=2026102104"></script>
+    <script src="AGV.js?v=2026100711"></script>
+    <!-- HAI ESS 區域3 即時 AGV（3F D 倉；WebSocket ws://10.176.33.77:9003/ws） -->
+    <script src="HAI-AGV.js?v=2026101029"></script>
+    <script src="啟動.js?v=2026102102"></script>
+    <!-- MQTT 出庫即時看板：依倉庫訂閱 2F-A/B/C/D，顯示出庫儲位 -->
+    <script src="lib/mqtt.min.js?v=2026100901"></script>
+    <script src="出庫MQTT.js?v=2026100905"></script>
+    <script type="module" src="手勢.js?v=2026101901"></script>
+</body>
+</html>
+
